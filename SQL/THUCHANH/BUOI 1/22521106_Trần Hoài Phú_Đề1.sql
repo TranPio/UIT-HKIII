@@ -1,0 +1,106 @@
+﻿CREATE DATABASE BAITHI
+GO
+ USE BAITHI
+CREATE TABLE RUNNERS 
+(
+	RunnerID char(5) primary key(RunnerID),
+	FirstName varchar(30),
+	LastName varchar(50),
+	DateOfBirth smalldatetime,
+	Gender varchar(10),
+	Phone varchar(20),
+	Country varchar(30),
+	Emergency_contact varchar(100)
+)
+CREATE TABLE RUNNING_EVENTS
+( 
+	EventID char(5) primary key(EventID),
+	EventName varchar(100),
+	EventDate smalldatetime,
+	Location varchar(50)
+)
+CREATE TABLE PARTICIPATIONS 
+( 
+	ParticipationID char(5) primary key(ParticipationID),
+	RunnerID char(5),
+	EventID char(5),
+	FinishTime smalldatetime,
+	Position int
+)
+
+--Cau1:
+ALTER TABLE PARTICIPATIONS ADD CONSTRAINT FK_RunnerID_Par FOREIGN KEY (RunnerID)  REFERENCES RUNNERS(RunnerID)
+ALTER TABLE PARTICIPATIONS ADD CONSTRAINT FK_Event_Par FOREIGN KEY (EventID)  REFERENCES RUNNING_EVENTS(EventID)
+--Cau2:
+--a.
+ALTER TABLE RUNNERS
+ADD CONSTRAINT CHK_gender CHECK (Gender='Nam' OR Gender='Nu');
+--b.
+--BANGTAMANHHUONG
+
+--					THEM					XOA					SUA
+--RUNNERS			+(DateOfBirth)			-					+(DateOfBirth)
+--RUNNING_EVENTS	+(EventDate)			-					+(EventDate)
+--PARTICIPATIONS	+(RunnerID,EventID)		-					+(RunnerID,EventID)
+
+go
+CREATE TRIGGER Checktren5tuoi
+ON PARTICIPATIONS
+AFTER INSERT, UPDATE
+AS
+BEGIN
+	DECLARE @EventDate SMALLDATETIME, @DateOfBirth SMALLDATETIME, @RunnerID char(5), @EventID char(5)
+
+	SELECT @RunnerID=RunnerID, @EventDate=EventID
+	FROM INSERTED
+
+	SELECT RUNNERS.DateOfBirth
+	FROM RUNNERS
+	WHERE RUNNERS.RunnerID=@RunnerID
+
+	SELECT RUNNING_EVENTS.EventDate
+	FROM RUNNING_EVENTS
+	WHERE RUNNING_EVENTS.EventID=@EventID
+
+	IF(YEAR(@EventDate)-YEAR(@DateOfBirth)>5)
+		BEGIN
+			PRINT 'OK'
+		END
+	ELSE
+		BEGIN
+			PRINT N'Người tham gia chạy bộ phải trên 5 tuổi'
+			ROLLBACK TRANSACTION
+		END
+
+END;
+--Cau3:
+--a.
+SELECT RunnerID, FirstName, LastName
+FROM RUNNERS
+WHERE RunnerID IN 
+		(	SELECT RunnerID
+			FROM RUNNING_EVENTS, PARTICIPATIONS
+			WHERE RUNNING_EVENTS.EventID=PARTICIPATIONS.EventID AND EventDate='11/11/2023'
+		)
+--b.
+SELECT RUNNERS.RunnerID, FirstName, LastName
+FROM RUNNERS LEFT JOIN PARTICIPATIONS ON RUNNERS.RunnerID=PARTICIPATIONS.RunnerID
+WHERE PARTICIPATIONS.RunnerID is NULL
+--C.
+SELECT TOP 1 WITH TIES RUNNERS.RunnerID, RUNNERS.FirstName, RUNNERS.LastName
+FROM RUNNERS
+	JOIN PARTICIPATIONS ON RUNNERS.RunnerID = PARTICIPATIONS.RunnerID
+		JOIN RUNNING_EVENTS ON PARTICIPATIONS.EventID = RUNNING_EVENTS.EventID
+WHERE RUNNING_EVENTS.EventName = 'Dalat Ultra Trail 2023'
+ORDER BY (YEAR(GETDATE())-YEAR(RUNNERS.DateOfBirth)) DESC
+--d.
+SELECT RUNNERS.RunnerID, FirstName, LastName, COUNT(PARTICIPATIONS.EventID) as Soluongthamgia
+FROM RUNNERS JOIN PARTICIPATIONS ON RUNNERS.RunnerID = PARTICIPATIONS.RunnerID
+GROUP BY RUNNERS.RunnerID, FirstName, LastName ;
+--e.
+SELECT * FROM RUNNERS
+WHERE NOT EXISTS (
+		SELECT * FROM RUNNING_EVENTS
+		WHERE YEAR(EventDate) = 2023 AND NOT EXISTS (
+			SELECT * FROM PARTICIPATIONS
+			WHERE PARTICIPATIONS.RunnerID = RUNNERS.RunnerID AND PARTICIPATIONS.EventID = RUNNING_EVENTS.EventID))

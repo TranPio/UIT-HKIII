@@ -1,0 +1,90 @@
+﻿-- Tạo các quan hệ
+CREATE TABLE TACGIA (
+    MaTG char(5) PRIMARY KEY,
+    HoTen varchar(20),
+    DiaChi varchar(50),
+    NgSinh smalldatetime,
+    SoDT varchar(15)
+);
+
+CREATE TABLE SACH (
+    MaSach char(5) PRIMARY KEY,
+    TenSach varchar(25),
+    TheLoai varchar(25)
+);
+
+CREATE TABLE TACGIA_SACH (
+    MaTG char(5),
+    MaSach char(5),
+    PRIMARY KEY (MaTG, MaSach),
+    FOREIGN KEY (MaTG) REFERENCES TACGIA(MaTG),
+    FOREIGN KEY (MaSach) REFERENCES SACH(MaSach)
+);
+
+CREATE TABLE PHATHANH (
+    MaPH char(5) PRIMARY KEY,
+    MaSach char(5),
+    NgayPH smalldatetime,
+    SoLuong int,
+    NhaXuatBan varchar(20),
+    FOREIGN KEY (MaSach) REFERENCES SACH(MaSach)
+);
+drop table PHATHANH
+-- Hiện thực các ràng buộc toàn vẹn
+-- 2.1 Ngày phát hành sách phải lớn hơn ngày sinh của tác giả
+--2.1
+--				THEM		XOA			SUA
+--TACGIA		+			-			+(NGSINH)
+--TACGIA_SACH	-			-()			-()
+--PHATHANH		+			-			+(NGAYPH)
+GO
+CREATE TRIGGER TRG_NGPH_NGSINH
+ON TACGIA
+FOR INSERT , UPDATE
+AS 
+BEGIN
+	DECLARE @MATG CHAR(5), @MASACH CHAR(5), @NGSINH SMALLDATETIME, @NGPH SMALLDATETIME
+	SELECT @MATG  = INSERTED.MATG, @NGSINH  = inserted.NGSINH, @MASACH = TACGIA_SACH.MASACH
+	FROM inserted , TACGIA_SACH
+	WHERE TACGIA_SACH.MATG = inserted.MATG
+	SELECT @NGPH = NgayPH
+	FROM PHATHANH
+	WHERE PHATHANH.MaSach  = @MASACH
+	IF (@NGPH<@NGSINH)
+	BEGIN 
+		PRINT'LOI'
+		ROLLBACK TRANSACTION
+	END
+	ELSE 
+	BEGIN
+		PRINT'OKE'
+	END
+END
+		
+--2.2
+--			THEM		XOA			SUA
+--SACH		+			-			+(THELOAI)
+--PHATHANH	+			-			+(NHAXUATBAN,MASACH)
+GO
+CREATE TRIGGER TRG_THELOAI_NHAXUATBAN
+ON SACH 
+FOR INSERT , UPDATE
+AS 
+BEGIN
+	DECLARE @MASACH CHAR(5), @THELOAI VARCHAR(25), @NHAXUATBAN VARCHAR(20), @MASACH2 CHAR(5)
+	SELECT @THELOAI = THELOAI, @MASACH = MASACH
+	FROM INSERTED
+	WHERE @THELOAI = 'Giao khoa'
+	SELECT @MASACH2   = PHATHANH.MASACH
+	FROM PHATHANH
+	WHERE @NHAXUATBAN = 'Giao duc'
+	IF (@MASACH != @MASACH2)
+	BEGIN 
+		PRINT'LOI'
+		ROLLBACK TRANSACTION
+	END
+	ELSE 
+	BEGIN
+		PRINT'OKE'
+	END
+END
